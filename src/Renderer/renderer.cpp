@@ -237,6 +237,7 @@ void endScene()
 		submitDebugCounter("All draw calls per frame: ",
 			quadRendererNumbers.drawCalls + lineRenderer.getNumberOfDrawCalls() + pointRenderer.getNrOfDrawCalls());
 
+		submitDebugCounter("QuadRenderer arena used memory (KB): ", quadRendererNumbers.arenaUsedMemory);
 		submitDebugCounter("Nr of instanced draw calls: ", quadRendererNumbers.drawCalls);
 		submitDebugCounter("Nr of render groups: ", quadRendererNumbers.renderGroups);
 		submitDebugArray(quadRendererNumbers.renderGroupsSizes, 12, "sizes");
@@ -246,7 +247,6 @@ void endScene()
 		submitDebugArray(quadRendererNumbers.notAffectedByLightRenderGroupsSizes, 12, "sizes");
 		submitDebugArray(quadRendererNumbers.notAffectedByLightRenderGroupsZ, 12, "z");
 		submitDebugArray(quadRendererNumbers.notAffectedByLightRenderGroupsIndices, 12, "indices");
-		submitDebugCounter("Nr of quad renderer allocations: ", quadRendererNumbers.allocations);
 		submitDebugCounter("Nr of drawn instanced sprites: ", quadRendererNumbers.drawnSprites);
 		submitDebugCounter("Nr of instanced textures: ", quadRendererNumbers.drawnTextures);
 		submitDebugCounter("Nr of line draw calls: ", lineRenderer.getNumberOfDrawCalls());

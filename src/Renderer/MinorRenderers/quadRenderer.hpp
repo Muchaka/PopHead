@@ -102,7 +102,7 @@ struct QuadRendererDebugNumbers
 	QuadRendererDebugArray notAffectedByLightRenderGroupsSizes = {}; 
 	QuadRendererDebugArray notAffectedByLightRenderGroupsZ = {}; 
 	QuadRendererDebugArray notAffectedByLightRenderGroupsIndices = {}; 
-	unsigned allocations = 0;
+	unsigned arenaUsedMemory = 0;
 	unsigned renderGroups = 0;
 	unsigned renderGroupsNotAffectedByLight = 0;
 	unsigned drawCalls = 0;
