@@ -38,7 +38,6 @@ namespace {
 	unsigned sharedDataUBO;
 
 	ph::PointRenderer pointRenderer;
-	ph::LineRenderer lineRenderer;
 	ph::LightRenderer lightRenderer;
 	ph::TextRenderer textRenderer;
 
@@ -71,10 +70,10 @@ void init(unsigned screenWidth, unsigned screenHeight)
 	// initialize minor renderers
 	QuadRenderer::setScreenBoundsPtr(&screenBounds);
 	pointRenderer.setScreenBoundsPtr(&screenBounds);
-	lineRenderer.setScreenBoundsPtr(&screenBounds);
+	LineRenderer::setScreenBoundsPtr(&screenBounds);
 	lightRenderer.setScreenBoundsPtr(&screenBounds);
 	QuadRenderer::init();
-	lineRenderer.init();
+	LineRenderer::init();
 	pointRenderer.init();
 	lightRenderer.init();
 	textRenderer.init();
@@ -135,7 +134,7 @@ void restart(unsigned screenWidth, unsigned screenHeight)
 void shutDown()
 {
 	QuadRenderer::shutDown();
-	lineRenderer.shutDown();
+	LineRenderer::shutDown();
 	lightRenderer.shutDown();
 	textRenderer.shutDown();
 	gameObjectsFramebuffer.remove();
@@ -244,7 +243,7 @@ void endScene()
 		auto quadRendererNumbers = QuadRenderer::getDebugNumbers();
 
 		submitDebugCounter("All draw calls per frame: ",
-			quadRendererNumbers.drawCalls + lineRenderer.getNumberOfDrawCalls() + pointRenderer.getNrOfDrawCalls());
+			quadRendererNumbers.drawCalls + LineRenderer::getNumberOfDrawCalls() + pointRenderer.getNrOfDrawCalls());
 
 		submitDebugCounter("QuadRenderer arena used memory (KB): ", quadRendererNumbers.arenaUsedMemory);
 		submitDebugCounter("Nr of instanced draw calls: ", quadRendererNumbers.drawCalls);
@@ -258,14 +257,14 @@ void endScene()
 		submitDebugArray(quadRendererNumbers.notAffectedByLightRenderGroupsIndices, 12, "indices");
 		submitDebugCounter("Nr of drawn instanced sprites: ", quadRendererNumbers.drawnSprites);
 		submitDebugCounter("Nr of instanced textures: ", quadRendererNumbers.drawnTextures);
-		submitDebugCounter("Nr of line draw calls: ", lineRenderer.getNumberOfDrawCalls());
+		submitDebugCounter("Nr of line draw calls: ", LineRenderer::getNumberOfDrawCalls());
 		submitDebugCounter("Nr of point draw calls: ", pointRenderer.getNrOfDrawCalls());
 		submitDebugCounter("Nr of drawn points: ", pointRenderer.getNrOfDrawnPoints());
 		submitDebugCounter("Nr of light draw calls: ", lightRenderer.getNrOfDrawCalls());
 		submitDebugCounter("Nr of light rays: ", lightRenderer.getNrOfRays());
 		
 		QuadRenderer::resetDebugNumbers();
-		lineRenderer.resetDebugNumbers();
+		LineRenderer::resetDebugNumbers();
 		pointRenderer.resetDebugNumbers();
 		lightRenderer.resetDebugNumbers();
 	}
@@ -294,7 +293,7 @@ void submitLine(sf::Color color, const sf::Vector2f positionA, const sf::Vector2
 void submitLine(sf::Color colorA, sf::Color colorB,
                           const sf::Vector2f positionA, const sf::Vector2f positionB, float thickness)
 {
-	lineRenderer.drawLine(colorA, colorB, positionA, positionB, thickness);
+	LineRenderer::drawLine(colorA, colorB, positionA, positionB, thickness);
 }
 
 void submitPoint(sf::Vector2f position, sf::Color color, unsigned char z, float size)
@@ -347,7 +346,7 @@ void handleEvent(sf::Event e)
 	if(e.type == sf::Event::KeyPressed && e.key.code == sf::Keyboard::F3) {
 		isDebugDisplayActive = !isDebugDisplayActive;
 		QuadRenderer::setDebugNumbersEnabled(isDebugDisplayActive);
-		lineRenderer.setDebugCountingActive(isDebugDisplayActive);
+		LineRenderer::setDebugCountingActive(isDebugDisplayActive);
 		pointRenderer.setDebugCountingActive(isDebugDisplayActive);
 	}
 	#endif

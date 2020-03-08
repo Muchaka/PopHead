@@ -5,30 +5,21 @@
 #include <SFML/System/Vector2.hpp>
 #include <SFML/Graphics/Color.hpp>
 
-namespace ph {
+namespace ph::LineRenderer {
 
-class LineRenderer
-{
-public:
-	void init();
-	void shutDown();
+void init();
+void shutDown();
 
-	void setScreenBoundsPtr(const FloatRect* screenBounds) { mScreenBounds = screenBounds; }
+void setScreenBoundsPtr(const FloatRect* screenBounds);
 
-	unsigned getNumberOfDrawCalls() const { return mNumberOfDrawCalls; }
+void drawLine(const sf::Color& colorA, const sf::Color& colorB,
+			  const sf::Vector2f positionA, const sf::Vector2f positionB, float thickness = 1.f);
 
-	void setDebugCountingActive(bool active) { mIsDebugCountingActive = active; }
-	void resetDebugNumbers();
-
-	void drawLine(const sf::Color& colorA, const sf::Color& colorB,
-	              const sf::Vector2f positionA, const sf::Vector2f positionB, float thickness = 1.f);
-private:
-	Shader mLineShader;
-	const FloatRect* mScreenBounds;
-	unsigned mLineVAO;
-	unsigned mLineVBO;
-	unsigned mNumberOfDrawCalls;
-	bool mIsDebugCountingActive = false;
-};
+#ifndef PH_DISTRIBUTION
+void setDebugCountingActive(bool active); 
+void resetDebugNumbers();
+unsigned getNumberOfDrawCalls(); 
+#endif
 
 }
+

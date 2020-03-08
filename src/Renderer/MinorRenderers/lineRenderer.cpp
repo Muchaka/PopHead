@@ -7,21 +7,33 @@
 #include "Utilities/cast.hpp"
 #include <GL/glew.h>
 
-namespace ph {
+namespace ph::LineRenderer {
 
-void LineRenderer::init()
+static Shader lineShader;
+static const FloatRect* screenBounds;
+static unsigned lineVAO;
+static unsigned lineVBO;
+static unsigned numberOfDrawCalls;
+static bool isDebugCountingActive = false;
+
+void setScreenBoundsPtr(const FloatRect* bounds) 
+{ 
+	screenBounds = bounds;
+}
+
+void init()
 {
-	mLineShader.init(shader::lineSrc());
-	mLineShader.initUniformBlock("SharedData", 0);
+	lineShader.init(shader::lineSrc());
+	lineShader.initUniformBlock("SharedData", 0);
 
 	GLCheck( glEnable(GL_LINE_SMOOTH) );
 	GLCheck( glHint(GL_LINE_SMOOTH_HINT, GL_NICEST) );
 
-	GLCheck( glGenVertexArrays(1, &mLineVAO) );
-	GLCheck( glBindVertexArray(mLineVAO) );
+	GLCheck( glGenVertexArrays(1, &lineVAO) );
+	GLCheck( glBindVertexArray(lineVAO) );
 
-	GLCheck( glGenBuffers(1, &mLineVBO) );
-	GLCheck( glBindBuffer(GL_ARRAY_BUFFER, mLineVBO) );
+	GLCheck( glGenBuffers(1, &lineVBO) );
+	GLCheck( glBindBuffer(GL_ARRAY_BUFFER, lineVBO) );
 	GLCheck( glBufferData(GL_ARRAY_BUFFER, 2 * 6 * sizeof(float), nullptr, GL_DYNAMIC_DRAW) );
 
 	GLCheck( glEnableVertexAttribArray(0) );
@@ -30,19 +42,14 @@ void LineRenderer::init()
 	GLCheck( glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(2 * sizeof(float))) );
 }
 
-void LineRenderer::shutDown()
+void shutDown()
 {
-	GLCheck( glDeleteVertexArrays(1, &mLineVAO) );
-	GLCheck( glDeleteBuffers(1, &mLineVBO) );
+	GLCheck( glDeleteVertexArrays(1, &lineVAO) );
+	GLCheck( glDeleteBuffers(1, &lineVBO) );
 }
 
-void LineRenderer::resetDebugNumbers()
-{
-	mNumberOfDrawCalls = 0;
-}
-
-void LineRenderer::drawLine(const sf::Color& colorA, const sf::Color& colorB,
-                            const sf::Vector2f posA, const sf::Vector2f posB, float thickness)
+void drawLine(const sf::Color& colorA, const sf::Color& colorB,
+              const sf::Vector2f posA, const sf::Vector2f posB, float thickness)
 {
 	auto colA = Cast::toNormalizedColorVector4f(colorA);
 	auto colB = Cast::toNormalizedColorVector4f(colorB);
@@ -50,18 +57,38 @@ void LineRenderer::drawLine(const sf::Color& colorA, const sf::Color& colorB,
 		posA.x, posA.y, colA.x, colA.y, colA.z, colA.w,
 		posB.x, posB.y, colB.x, colB.y, colB.z, colB.w
 	};
-	GLCheck( glBindBuffer(GL_ARRAY_BUFFER, mLineVBO) );
+	GLCheck( glBindBuffer(GL_ARRAY_BUFFER, lineVBO) );
 	GLCheck( glBufferSubData(GL_ARRAY_BUFFER, 0, 2 * 6 * sizeof(float), vertexData) );
 
-	GLCheck( glBindVertexArray(mLineVAO) );
-	mLineShader.bind();
+	GLCheck( glBindVertexArray(lineVAO) );
+	lineShader.bind();
 	
-	GLCheck( glLineWidth(thickness * (360.f / mScreenBounds->height)) );
+	GLCheck( glLineWidth(thickness * (360.f / screenBounds->height)) );
 
 	GLCheck( glDrawArrays(GL_LINES, 0, 2) );
 
-	if(mIsDebugCountingActive)
-		++mNumberOfDrawCalls;
+#ifndef PH_DISTRIBUTION
+	if(isDebugCountingActive)
+		++numberOfDrawCalls;
+#endif
 }
+
+#ifndef PH_DISTRIBUTION
+void resetDebugNumbers()
+{
+	numberOfDrawCalls = 0;
+}
+
+unsigned getNumberOfDrawCalls() const 
+{
+	return numberOfDrawCalls; 
+}
+
+void setDebugCountingActive(bool active) 
+{ 
+	isDebugCountingActive = active; 
+}
+#endif
+
 
 }
