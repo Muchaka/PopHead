@@ -79,7 +79,7 @@ void resetDebugNumbers()
 	numberOfDrawCalls = 0;
 }
 
-unsigned getNumberOfDrawCalls() const 
+unsigned getNumberOfDrawCalls()
 {
 	return numberOfDrawCalls; 
 }

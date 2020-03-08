@@ -39,7 +39,6 @@ struct QuadRenderGroup
 	unsigned texturesSize;
 	unsigned texturesCapacity;
 
-	unsigned quadsDataArenaSize;
 	unsigned quadsDataSize;
 	unsigned quadsDataCapacity;
 };

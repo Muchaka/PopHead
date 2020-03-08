@@ -15,7 +15,7 @@ namespace ph::QuadRenderer {
 
 struct RenderGroupsHashMap
 {
-	BumpMemoryArena arena;
+	LinkedMemoryArena arena;
 	unsigned* indices = nullptr;
 	RenderGroupKey* keys = nullptr;
 	QuadRenderGroup* renderGroups = nullptr;
@@ -100,24 +100,13 @@ static QuadRenderGroup* insertIfDoesNotExitstAndGetRenderGroup(RenderGroupsHashM
 	}
 	#endif
 
-	// TODO: reallocate if there is no more space
-	/*
 	if(hashMap->capacity == hashMap->size)
 	{
 		hashMap->capacity *= 2;
-
-		void* newIndices = realloc(hashMap->indices, hashMap->capacity * sizeof(unsigned));
-		PH_ASSERT_CRITICAL(newIndices, "quad render group hash map indices realloc failed!");
-		hashMap->indices = (unsigned*)newIndices;
-
-		void* newKeys = realloc(hashMap->keys, hashMap->capacity * sizeof(RenderGroupKey));
-		PH_ASSERT_CRITICAL(newKeys, "quad render group hash map keys realloc failed!");
-		hashMap->keys = (RenderGroupKey*)newKeys;
-
-		void* newRenderGroups = realloc(hashMap->renderGroups, hashMap->capacity * sizeof(QuadRenderGroup));
-		PH_ASSERT_CRITICAL(newRenderGroups, "quad render group hash map render groups realloc failed!");
-		hashMap->renderGroups = (QuadRenderGroup*)newRenderGroups;
-	}*/
+		hashMap->indices = (unsigned*)rePushArray(&hashMap->arena, hashMap->indices, hashMap->capacity, unsigned);
+		hashMap->keys = (RenderGroupKey*)rePushArray(&hashMap->arena, hashMap->keys, hashMap->capacity, RenderGroupKey);
+		hashMap->renderGroups = (QuadRenderGroup*)rePushArray(&hashMap->arena, hashMap->renderGroups, hashMap->capacity, QuadRenderGroup);
+	}
 
 	// insert data to hash map and render group
 	hashMap->indices[hashMap->size] = hashMap->size;
@@ -127,7 +116,6 @@ static QuadRenderGroup* insertIfDoesNotExitstAndGetRenderGroup(RenderGroupsHashM
 	quadDataCount = bumpToNext4000(quadDataCount);
 	size_t arenaSize = sizeof(QuadData) * quadDataCount; 
 	QuadRenderGroup& qrg = hashMap->renderGroups[hashMap->size];
-	qrg.quadsDataArenaSize = (unsigned)arenaSize; 
 	qrg.texturesSize = 0;
 	qrg.texturesCapacity = 32;
 	qrg.textures = (unsigned*)pushArray(&hashMap->arena, 32, unsigned);
@@ -151,24 +139,16 @@ static auto getTextureSlotToWhichThisTextureIsBound(const Texture* texture, Quad
 	return std::nullopt;
 }
 
-static void insertQuadDataToQuadRenderGroup(QuadData* quadData, unsigned count, QuadRenderGroup* quadRenderGroup)
+static void insertQuadDataToQuadRenderGroup(QuadData* quadData, unsigned count, QuadRenderGroup* quadRenderGroup, RenderGroupsHashMap* hashMap)
 {
-	// TODO: reallocate quad render group arena
-	/*
 	bool thereIsNoPlaceForNewQuadData = quadRenderGroup->quadsDataSize + count > quadRenderGroup->quadsDataCapacity;
 	if(thereIsNoPlaceForNewQuadData)
 	{
-		size_t oldArenaSize = (size_t)quadRenderGroup->quadsDataArenaSize; 
-		void* oldArena = (void*)quadRenderGroup->quadsData; 
+		// reallocate quads data 
 		unsigned newQuadsDataCapacity = quadRenderGroup->quadsDataCapacity + count * 2; 
-		size_t newArenaSize = newQuadsDataCapacity * sizeof(QuadData); 
-		quadRenderGroup->quadsDataArenaSize = newArenaSize;
-		quadRenderGroup->quadsDataCapacity = newQuadsDataCapacity; 
-		quadRenderGroup->quadsData = (QuadData*)allocateArena(newArenaSize);
-		memcpy(quadRenderGroup->quadsData, oldArena, oldArenaSize);
-		deallocateArena(oldArena);
+		quadRenderGroup->quadsDataCapacity = newQuadsDataCapacity;
+		rePushArray(&hashMap->arena, quadRenderGroup->quadsData, newQuadsDataCapacity, QuadData);
 	}
-	*/
 	void* writePtr = quadRenderGroup->quadsData + (quadRenderGroup->quadsDataSize);
 	memcpy(writePtr, quadData, sizeof(QuadData) * count);
 	quadRenderGroup->quadsDataSize += count;
@@ -184,7 +164,7 @@ void init()
 		auto initRenderGroupsHashMap = [](RenderGroupsHashMap& hashMap, size_t subArenaSize)
 		{
 			constexpr size_t initGroupsCapacity = 150;
-			hashMap.arena = subArena(&quadRendererArena, subArenaSize); 
+			hashMap.arena = subLinkedArena(&quadRendererArena, subArenaSize); 
 			hashMap.indices = (unsigned*)pushArray(&hashMap.arena, initGroupsCapacity, unsigned);
 			hashMap.keys = (RenderGroupKey*)pushArray(&hashMap.arena, initGroupsCapacity, RenderGroupKey); 
 			hashMap.renderGroups = (QuadRenderGroup*)pushArray(&hashMap.arena, initGroupsCapacity, QuadRenderGroup); 
@@ -270,7 +250,7 @@ void submitBunchOfQuadsWithTheSameTexture(std::vector<QuadData>& quadsData, Text
 		++renderGroup->texturesSize;
 	}
 
-	insertQuadDataToQuadRenderGroup(quadsData.data(), (unsigned)quadsData.size(), renderGroup);
+	insertQuadDataToQuadRenderGroup(quadsData.data(), (unsigned)quadsData.size(), renderGroup, &renderGroupsHashMap);
 }
 
 void submitQuad(Texture* texture, const IntRect* textureRect, const sf::Color* color, const Shader* shader,
@@ -332,7 +312,7 @@ void submitQuad(Texture* texture, const IntRect* textureRect, const sf::Color* c
 		++renderGroup->texturesSize;
 	}
 
-	insertQuadDataToQuadRenderGroup(&quadData, 1, renderGroup);
+	insertQuadDataToQuadRenderGroup(&quadData, 1, renderGroup, &hashMap);
 }
 
 void flush(bool affectedByLight)
