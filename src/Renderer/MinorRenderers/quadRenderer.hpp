@@ -14,6 +14,7 @@ namespace ph {
 
 namespace ph::QuadRenderer {
 
+#ifndef PH_DISTRIBUTION
 struct DebugArray
 {
 	unsigned data[100] = {};
@@ -39,6 +40,7 @@ struct DebugNumbers
 DebugNumbers getDebugNumbers();
 void resetDebugNumbers();
 void setDebugNumbersEnabled(bool enabled);
+#endif
 
 void init();
 void shutDown();

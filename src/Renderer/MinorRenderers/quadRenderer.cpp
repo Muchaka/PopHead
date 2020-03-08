@@ -27,7 +27,6 @@ struct RenderGroupsHashMap
 static BumpMemoryArena quadRendererArena;
 static RenderGroupsHashMap renderGroupsHashMap;
 static RenderGroupsHashMap notAffectedByLightRenderGroupsHashMap;
-static DebugNumbers* debugNumbers;
 
 static Shader defaultQuadShader;
 static const FloatRect* screenBounds; 
@@ -36,6 +35,9 @@ static Texture* whiteTexture;
 static unsigned quadIBO;
 static unsigned quadsDataVBO;
 static unsigned quadsDataVAO;
+
+#ifndef PH_DISTRIBUTION
+static DebugNumbers* debugNumbers;
 static bool debugNumbersEnabled = false;
 
 void setDebugNumbersEnabled(bool enabled)
@@ -43,7 +45,7 @@ void setDebugNumbersEnabled(bool enabled)
 	debugNumbersEnabled = enabled;
 }
 
-void pushBack(DebugArray* arr, unsigned e)
+static void pushBack(DebugArray* arr, unsigned e)
 {
 	if(arr->marker > 100) __debugbreak();
 	arr->data[arr->marker++] = e;
@@ -62,6 +64,7 @@ void resetDebugNumbers()
 	debugNumbers->drawnSprites = 0;
 	debugNumbers->drawnTextures = 0;
 }
+#endif
 
 static unsigned bumpToNext4000(unsigned size)
 {
@@ -71,7 +74,7 @@ static unsigned bumpToNext4000(unsigned size)
 	return size + 4000 - temp;	
 }
 
-bool operator==(const RenderGroupKey& lhs, const RenderGroupKey& rhs)
+static bool operator==(const RenderGroupKey& lhs, const RenderGroupKey& rhs)
 {
 	return lhs.shader == rhs.shader && lhs.z == rhs.z;
 }
@@ -83,6 +86,7 @@ static QuadRenderGroup* insertIfDoesNotExitstAndGetRenderGroup(RenderGroupsHashM
 		if(key == *(hashMap->keys + i))
 			return hashMap->renderGroups + i;
 
+	#ifndef PH_DISTRIBUTION
 	// bump debug numbers
 	if(hashMap == &renderGroupsHashMap)
 	{
@@ -94,6 +98,7 @@ static QuadRenderGroup* insertIfDoesNotExitstAndGetRenderGroup(RenderGroupsHashM
 		debugNumbers->renderGroupsNotAffectedByLight = hashMap->size; 
 		pushBack(&debugNumbers->notAffectedByLightRenderGroupsZ, (unsigned)(key.z * 255));
 	}
+	#endif
 
 	// TODO: reallocate if there is no more space
 	/*
@@ -189,8 +194,11 @@ void init()
 		allocateAndInitArena(&quadRendererArena, Megabytes(512));	
 		initRenderGroupsHashMap(renderGroupsHashMap, Megabytes(512 / 4 * 3));
 		initRenderGroupsHashMap(notAffectedByLightRenderGroupsHashMap, Megabytes(512 / 4));
+
+		#ifndef PH_DISTRIBUTION
 		debugNumbers = (DebugNumbers*)malloc(sizeof(DebugNumbers));
 		memset(debugNumbers, 0, sizeof(DebugNumbers));
+		#endif
 	}
 
 	defaultQuadShader.init(shader::quadSrc());
@@ -331,8 +339,10 @@ void flush(bool affectedByLight)
 {
 	PH_PROFILE_FUNCTION(0);
 
+	#ifndef PH_DISTRIBUTION
 	debugNumbers->arenaUsedMemory = unsigned(renderGroupsHashMap.arena.used / 1024 +
 	                                        notAffectedByLightRenderGroupsHashMap.arena.used / 1024); 
+	#endif
 
 	currentlyBoundQuadShader = nullptr;
 	auto& hashMap = affectedByLight ? renderGroupsHashMap : notAffectedByLightRenderGroupsHashMap;
@@ -357,12 +367,14 @@ void flush(bool affectedByLight)
 			}
 		}
 		
+		#ifndef PH_DISTRIBUTION
 		debugNumbers->renderGroupsIndices.marker = 0;
 		auto& debugIndices = affectedByLight ? debugNumbers->renderGroupsIndices : debugNumbers->notAffectedByLightRenderGroupsIndices;
 		for(unsigned i = 0; i < hashMap.size; ++i)
 		{
 			pushBack(&debugNumbers->renderGroupsIndices, hashMap.indices[i]);
 		}
+		#endif
 	}
 
 	for(unsigned i = 0; i < hashMap.size; ++i)
@@ -371,6 +383,7 @@ void flush(bool affectedByLight)
 		auto& key = hashMap.keys[renderGroupIndex];
 		auto& rg = hashMap.renderGroups[renderGroupIndex];
 
+		#ifndef PH_DISTRIBUTION
 		// update debug info
 		if(debugNumbersEnabled)
 		{
@@ -381,6 +394,7 @@ void flush(bool affectedByLight)
 			else
 				pushBack(&debugNumbers->notAffectedByLightRenderGroupsSizes, rg.quadsDataSize);
 		}
+		#endif
 
 		// set up shader
 		if(key.shader != currentlyBoundQuadShader) 
@@ -426,7 +440,9 @@ void flush(bool affectedByLight)
 			GLCheck( glBindVertexArray(quadsDataVAO) );
 			GLCheck( glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, (GLsizei)nrOfInstances) );
 
+			#ifndef PH_DISTRIBUTION
 			++debugNumbers->drawCalls;
+			#endif
 		};
 
 		for(size_t i = 0; i < rg.quadsDataSize; ++i)

@@ -44,7 +44,9 @@ namespace {
 
 	ph::Camera gameWorldCamera; 
 
+	#ifndef PH_DISTRIBUTION
 	bool isDebugDisplayActive = false;
+	#endif
 }
 
 namespace ph::Renderer {
@@ -214,6 +216,7 @@ void endScene()
 	GLCheck( glDisable(GL_FRAMEBUFFER_SRGB) );
 	QuadRenderer::flush(false);
 
+	#ifndef PH_DISTRIBUTION
 	// display renderer debug info 
 	if(isDebugDisplayActive)
 	{
@@ -266,6 +269,7 @@ void endScene()
 		pointRenderer.resetDebugNumbers();
 		lightRenderer.resetDebugNumbers();
 	}
+	#endif
 }
 
 void submitQuad(Texture* texture, const IntRect* textureRect, const sf::Color* color, const Shader* shader,
@@ -339,11 +343,15 @@ void submitTextArea(const char* text, const char* fontFilename, sf::Vector2f pos
 
 void handleEvent(sf::Event e)
 {
+	#ifndef PH_DISTRIBUTION
 	if(e.type == sf::Event::KeyPressed && e.key.code == sf::Keyboard::F3) {
 		isDebugDisplayActive = !isDebugDisplayActive;
+		QuadRenderer::setDebugNumbersEnabled(isDebugDisplayActive);
 		lineRenderer.setDebugCountingActive(isDebugDisplayActive);
 		pointRenderer.setDebugCountingActive(isDebugDisplayActive);
 	}
+	#endif
+	
 	if(e.type == sf::Event::Resized) {
 		GLCheck( glViewport(0, 0, e.size.width, e.size.height) );
 		gameObjectsFramebuffer.onWindowResize(e.size.width, e.size.height);
