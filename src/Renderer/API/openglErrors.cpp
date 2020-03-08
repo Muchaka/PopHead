@@ -1,6 +1,8 @@
 #include "openglErrors.hpp"
 #include "GL/glew.h"
+#include "Logs/logs.hpp"
 #include <iostream>
+#include <string>
 
 namespace ph::OpenGLErrors {
 
@@ -49,6 +51,8 @@ bool logErrors(const char* functionSignature, const char* fileName, unsigned num
 		description = "You do something that would attempt to read from or write/render to a framebuffer that is not complete.";
 		break;
 	}
+
+	PH_LOG_ERROR("OpenGL Error nr " + std::to_string(errorCode) + " " + error + " " + description);
 
 	std::cout << "OpenGL Error nr " << errorCode << ": " << error << "\n" <<
 		"description: " << description << "\n" <<

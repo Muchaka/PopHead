@@ -9,99 +9,25 @@
 #include <optional>
 
 namespace ph {
-
-class Texture;
-
-/*
-bool operator == (const RenderGroupKey& lhs, const RenderGroupKey& rhs);
-
-class RenderGroupsHashMap
-{
-public:
-	RenderGroupsHashMap();
-	QuadRenderGroup& insertIfDoesNotExistAndGetRenderGroup(RenderGroupKey);
-	auto getUnderlyingVector() -> std::vector<std::pair<RenderGroupKey, QuadRenderGroup>>&;
-	size_t size() const { return mRenderGroups.size(); }
-private:
-	QuadRenderGroup* getRenderGroup(RenderGroupKey);
-	void sort();
-	void eraseUselessGroups();
-
-private:
-	std::vector<std::pair<RenderGroupKey, QuadRenderGroup>> mRenderGroups;
-	bool mShouldSort;
-};
-
-RenderGroupsHashMap::RenderGroupsHashMap()
-	:mShouldSort(false)
-{
-	mRenderGroups.reserve(10);
+	class Texture;
 }
 
-QuadRenderGroup& RenderGroupsHashMap::insertIfDoesNotExistAndGetRenderGroup(RenderGroupKey key) 
-{
-	if(auto renderGroup = getRenderGroup(key))
-		return *renderGroup;
-	mRenderGroups.emplace_back(std::pair(key, QuadRenderGroup()));
-	mShouldSort = true;
-	return *getRenderGroup(key);
-}
+namespace ph::QuadRenderer {
 
-auto RenderGroupsHashMap::getUnderlyingVector() -> std::vector<std::pair<RenderGroupKey, QuadRenderGroup>>&
-{
-	eraseUselessGroups();
-	sort();
-	return mRenderGroups;
-}
-
-void RenderGroupsHashMap::sort()
-{
-	if(!mShouldSort)
-		return;
-
-	// TODO_ren: Make more smart sorting so we don't need to rebind shaders that often
-	//           Use the fact that we don't need to sort everything by z because not every quad is transparent
-
-	std::sort(mRenderGroups.begin(), mRenderGroups.end(), []
-	(const std::pair<RenderGroupKey, QuadRenderGroup>& a, std::pair<RenderGroupKey, QuadRenderGroup>& b) {
-		return a.first.z > b.first.z;
-	});
-}
-
-void RenderGroupsHashMap::eraseUselessGroups()
-{
-	for(size_t i = 0; i < mRenderGroups.size(); ++i)
-		if(mRenderGroups[i].second.quadsData.empty())
-			mRenderGroups.erase(mRenderGroups.begin() + i);
-}
-
-QuadRenderGroup* RenderGroupsHashMap::getRenderGroup(RenderGroupKey key)
-{
-	for(size_t i = 0; i < mRenderGroups.size(); ++i)
-		if(mRenderGroups[i].first == key)
-			return &mRenderGroups[i].second;
-	return nullptr;
-}
-
-bool operator==(const RenderGroupKey& lhs, const RenderGroupKey& rhs)
-{
-	return lhs.shader == rhs.shader && lhs.z == rhs.z;
-}*/
-
-struct QuadRendererDebugArray
+struct DebugArray
 {
 	unsigned data[100] = {};
 	unsigned marker = 0;
 };
 
-struct QuadRendererDebugNumbers
+struct DebugNumbers
 {
-	QuadRendererDebugArray renderGroupsSizes = {}; 
-	QuadRendererDebugArray renderGroupsZ = {}; 
-	QuadRendererDebugArray renderGroupsIndices = {}; 
-	QuadRendererDebugArray notAffectedByLightRenderGroupsSizes = {}; 
-	QuadRendererDebugArray notAffectedByLightRenderGroupsZ = {}; 
-	QuadRendererDebugArray notAffectedByLightRenderGroupsIndices = {}; 
+	DebugArray renderGroupsSizes = {}; 
+	DebugArray renderGroupsZ = {}; 
+	DebugArray renderGroupsIndices = {}; 
+	DebugArray notAffectedByLightRenderGroupsSizes = {}; 
+	DebugArray notAffectedByLightRenderGroupsZ = {}; 
+	DebugArray notAffectedByLightRenderGroupsIndices = {}; 
 	unsigned arenaUsedMemory = 0;
 	unsigned renderGroups = 0;
 	unsigned renderGroupsNotAffectedByLight = 0;
@@ -110,33 +36,21 @@ struct QuadRendererDebugNumbers
 	unsigned drawnTextures = 0;
 };
 
-QuadRendererDebugNumbers getQuadRendererDebugNumbers();
-void resetQuadRendererDebugNumbers();
+DebugNumbers getDebugNumbers();
+void resetDebugNumbers();
+void setDebugNumbersEnabled(bool enabled);
 
-class QuadRenderer
-{
-public:
-	void init();
-	void shutDown();
+void init();
+void shutDown();
 
-	void setScreenBoundsPtr(const FloatRect* bounds) { mScreenBounds = bounds; }
-	void setDebugCountingActive(bool active) { mIsDebugCountingActive = active; }
+void setScreenBoundsPtr(const FloatRect* bounds); 
 
-	void submitBunchOfQuadsWithTheSameTexture(std::vector<QuadData>&, Texture*, const Shader*, float z, ProjectionType projectionType);
+void submitBunchOfQuadsWithTheSameTexture(std::vector<QuadData>&, Texture*, const Shader*, float z, ProjectionType projectionType);
 
-	void submitQuad(Texture*, const IntRect* textureRect, const sf::Color*, const Shader*,
-	                sf::Vector2f position, sf::Vector2f size, float z, float rotation, sf::Vector2f rotationOrigin, ProjectionType, bool isAffectedByLight);
-	void flush(bool affectedByLight);
+void submitQuad(Texture*, const IntRect* textureRect, const sf::Color*, const Shader*,
+				sf::Vector2f position, sf::Vector2f size, float z, float rotation, sf::Vector2f rotationOrigin, ProjectionType, bool isAffectedByLight);
 
-private:
-	Shader mDefaultQuadShader;
-	const FloatRect* mScreenBounds; 
-	const Shader* mCurrentlyBoundQuadShader;
-	Texture* mWhiteTexture;
-	unsigned mQuadIBO;
-	unsigned mQuadsDataVBO;
-	unsigned mVAO;
-	bool mIsDebugCountingActive = false;
-};
+void flush(bool affectedByLight);
 
 }
+

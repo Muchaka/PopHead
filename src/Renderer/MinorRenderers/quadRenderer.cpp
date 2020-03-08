@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cstdlib>
 
-namespace ph {
+namespace ph::QuadRenderer {
 
 struct RenderGroupsHashMap
 {
@@ -27,20 +27,40 @@ struct RenderGroupsHashMap
 static BumpMemoryArena quadRendererArena;
 static RenderGroupsHashMap renderGroupsHashMap;
 static RenderGroupsHashMap notAffectedByLightRenderGroupsHashMap;
-static QuadRendererDebugNumbers debugNumbers;
+static DebugNumbers* debugNumbers;
 
-QuadRendererDebugNumbers getQuadRendererDebugNumbers()
+static Shader defaultQuadShader;
+static const FloatRect* screenBounds; 
+static const Shader* currentlyBoundQuadShader;
+static Texture* whiteTexture;
+static unsigned quadIBO;
+static unsigned quadsDataVBO;
+static unsigned quadsDataVAO;
+static bool debugNumbersEnabled = false;
+
+void setDebugNumbersEnabled(bool enabled)
 {
-	return debugNumbers;
+	debugNumbersEnabled = enabled;
 }
 
-void resetQuadRendererDebugNumbers()
+void pushBack(DebugArray* arr, unsigned e)
 {
-	debugNumbers.renderGroupsSizes = {}; 
-	debugNumbers.notAffectedByLightRenderGroupsSizes = {}; 
-	debugNumbers.drawCalls = 0;
-	debugNumbers.drawnSprites = 0;
-	debugNumbers.drawnTextures = 0;
+	if(arr->marker > 100) __debugbreak();
+	arr->data[arr->marker++] = e;
+}
+
+DebugNumbers getDebugNumbers()
+{
+	return *debugNumbers;
+}
+
+void resetDebugNumbers()
+{
+	debugNumbers->renderGroupsSizes = {}; 
+	debugNumbers->notAffectedByLightRenderGroupsSizes = {}; 
+	debugNumbers->drawCalls = 0;
+	debugNumbers->drawnSprites = 0;
+	debugNumbers->drawnTextures = 0;
 }
 
 static unsigned bumpToNext4000(unsigned size)
@@ -66,15 +86,13 @@ static QuadRenderGroup* insertIfDoesNotExitstAndGetRenderGroup(RenderGroupsHashM
 	// bump debug numbers
 	if(hashMap == &renderGroupsHashMap)
 	{
-		debugNumbers.renderGroups = hashMap->size;
-		// TODO: Clean this up
-		debugNumbers.renderGroupsZ.data[debugNumbers.renderGroupsZ.marker++] = (unsigned)(key.z * 255);
+		debugNumbers->renderGroups = hashMap->size;
+		pushBack(&debugNumbers->renderGroupsZ, (unsigned)(key.z * 255));
 	}
 	else if(hashMap == &notAffectedByLightRenderGroupsHashMap)
 	{
-		debugNumbers.renderGroupsNotAffectedByLight = hashMap->size; 
-		// TODO: Clean this up
-		debugNumbers.notAffectedByLightRenderGroupsZ.data[debugNumbers.notAffectedByLightRenderGroupsZ.marker++] = (unsigned)(key.z * 255);
+		debugNumbers->renderGroupsNotAffectedByLight = hashMap->size; 
+		pushBack(&debugNumbers->notAffectedByLightRenderGroupsZ, (unsigned)(key.z * 255));
 	}
 
 	// TODO: reallocate if there is no more space
@@ -151,7 +169,7 @@ static void insertQuadDataToQuadRenderGroup(QuadData* quadData, unsigned count, 
 	quadRenderGroup->quadsDataSize += count;
 }
 
-void QuadRenderer::init()
+void init()
 {
 	static bool shouldInitializeRenderGroups = true;
 	if(shouldInitializeRenderGroups)
@@ -171,21 +189,23 @@ void QuadRenderer::init()
 		allocateAndInitArena(&quadRendererArena, Megabytes(512));	
 		initRenderGroupsHashMap(renderGroupsHashMap, Megabytes(512 / 4 * 3));
 		initRenderGroupsHashMap(notAffectedByLightRenderGroupsHashMap, Megabytes(512 / 4));
+		debugNumbers = (DebugNumbers*)malloc(sizeof(DebugNumbers));
+		memset(debugNumbers, 0, sizeof(DebugNumbers));
 	}
 
-	mDefaultQuadShader.init(shader::quadSrc());
-	mDefaultQuadShader.initUniformBlock("SharedData", 0);
+	defaultQuadShader.init(shader::quadSrc());
+	defaultQuadShader.initUniformBlock("SharedData", 0);
 
-	GLCheck( glGenVertexArrays(1, &mVAO) );
-	GLCheck( glBindVertexArray(mVAO) );
+	GLCheck( glGenVertexArrays(1, &quadsDataVAO) );
+	GLCheck( glBindVertexArray(quadsDataVAO) );
 
 	unsigned quadIndices[] = {0, 1, 3, 1, 2, 3};
-	GLCheck( glGenBuffers(1, &mQuadIBO) );
-	GLCheck( glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mQuadIBO) );
+	GLCheck( glGenBuffers(1, &quadIBO) );
+	GLCheck( glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quadIBO) );
 	GLCheck( glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), quadIndices, GL_STATIC_DRAW) ); 
 
-	GLCheck( glGenBuffers(1, &mQuadsDataVBO) );
-	GLCheck( glBindBuffer(GL_ARRAY_BUFFER, mQuadsDataVBO) );
+	GLCheck( glGenBuffers(1, &quadsDataVBO) );
+	GLCheck( glBindBuffer(GL_ARRAY_BUFFER, quadsDataVBO) );
 
 	GLCheck( glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(QuadData), (void*) offsetof(QuadData, color)) );
 	GLCheck( glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(QuadData), (void*) offsetof(QuadData, textureRect)) );
@@ -202,32 +222,32 @@ void QuadRenderer::init()
 		GLCheck( glVertexAttribDivisor(i, 1) );
 	}
 
-	mWhiteTexture = new Texture;
+	whiteTexture = new Texture;
 	unsigned white = 0xffffffff;
-	mWhiteTexture->setData(&white, sizeof(unsigned), sf::Vector2i(1, 1));
+	whiteTexture->setData(&white, sizeof(unsigned), sf::Vector2i(1, 1));
 }
 
-void QuadRenderer::shutDown()
+void shutDown()
 {
-	delete mWhiteTexture;
-	mDefaultQuadShader.remove();
-	GLCheck( glDeleteBuffers(1, &mQuadIBO) );
-	GLCheck( glDeleteBuffers(1, &mQuadsDataVBO) );
-	GLCheck( glDeleteVertexArrays(1, &mVAO) );
+	delete whiteTexture;
+	defaultQuadShader.remove();
+	GLCheck( glDeleteBuffers(1, &quadIBO) );
+	GLCheck( glDeleteBuffers(1, &quadsDataVBO) );
+	GLCheck( glDeleteVertexArrays(1, &quadsDataVAO) );
 }
 
-void QuadRenderer::submitBunchOfQuadsWithTheSameTexture(std::vector<QuadData>& quadsData, Texture* texture,
-                                                        const Shader* shader, float z, ProjectionType projectionType)
+void submitBunchOfQuadsWithTheSameTexture(std::vector<QuadData>& quadsData, Texture* texture,
+                                          const Shader* shader, float z, ProjectionType projectionType)
 {
 	if(!shader)
-		shader = &mDefaultQuadShader;
+		shader = &defaultQuadShader;
 
 	QuadRenderGroup* renderGroup = 
 		insertIfDoesNotExitstAndGetRenderGroup(&renderGroupsHashMap, {shader, z, projectionType}, (unsigned)quadsData.size());
 
 
 	if(!texture)
-		texture = mWhiteTexture;
+		texture = whiteTexture;
 	auto textureSlotOfThisTexture = getTextureSlotToWhichThisTextureIsBound(texture, renderGroup);
 	if(textureSlotOfThisTexture) 
 	{
@@ -245,12 +265,12 @@ void QuadRenderer::submitBunchOfQuadsWithTheSameTexture(std::vector<QuadData>& q
 	insertQuadDataToQuadRenderGroup(quadsData.data(), (unsigned)quadsData.size(), renderGroup);
 }
 
-void QuadRenderer::submitQuad(Texture* texture, const IntRect* textureRect, const sf::Color* color, const Shader* shader,
-                              sf::Vector2f position, sf::Vector2f size, float z, float rotation, sf::Vector2f rotationOrigin,
-                              ProjectionType projectionType, bool isAffectedByLight)
+void submitQuad(Texture* texture, const IntRect* textureRect, const sf::Color* color, const Shader* shader,
+                sf::Vector2f position, sf::Vector2f size, float z, float rotation, sf::Vector2f rotationOrigin,
+                ProjectionType projectionType, bool isAffectedByLight)
 {
 	// culling
-	FloatRect bounds = projectionType == ProjectionType::gameWorld ? *mScreenBounds : FloatRect(0.f, 0.f, 1920.f, 1080.f);
+	FloatRect bounds = projectionType == ProjectionType::gameWorld ? *screenBounds : FloatRect(0.f, 0.f, 1920.f, 1080.f);
 	if(rotation == 0.f)
 		if(!bounds.doPositiveRectsIntersect(FloatRect(position.x, position.y, size.x, size.y)))
 			return;
@@ -259,7 +279,7 @@ void QuadRenderer::submitQuad(Texture* texture, const IntRect* textureRect, cons
 
 	// if shader is not specified use default shader 
 	if(!shader)
-		shader = &mDefaultQuadShader;
+		shader = &defaultQuadShader;
 
 	// find or add draw call group
 	auto& hashMap = isAffectedByLight ? renderGroupsHashMap : notAffectedByLightRenderGroupsHashMap;
@@ -291,7 +311,7 @@ void QuadRenderer::submitQuad(Texture* texture, const IntRect* textureRect, cons
 	quadData.rotation = Math::degreesToRadians(rotation);
 	
 	if(!texture)
-		texture = mWhiteTexture;
+		texture = whiteTexture;
 	if(auto textureSlotOfThisTexture = getTextureSlotToWhichThisTextureIsBound(texture, renderGroup))
 	{
 		quadData.textureSlotRef = *textureSlotOfThisTexture;
@@ -307,14 +327,14 @@ void QuadRenderer::submitQuad(Texture* texture, const IntRect* textureRect, cons
 	insertQuadDataToQuadRenderGroup(&quadData, 1, renderGroup);
 }
 
-void QuadRenderer::flush(bool affectedByLight)
+void flush(bool affectedByLight)
 {
 	PH_PROFILE_FUNCTION(0);
 
-	debugNumbers.arenaUsedMemory = renderGroupsHashMap.arena.used / 1024 +
-	                               notAffectedByLightRenderGroupsHashMap.arena.used / 1024; 
+	debugNumbers->arenaUsedMemory = unsigned(renderGroupsHashMap.arena.used / 1024 +
+	                                        notAffectedByLightRenderGroupsHashMap.arena.used / 1024); 
 
-	mCurrentlyBoundQuadShader = nullptr;
+	currentlyBoundQuadShader = nullptr;
 	auto& hashMap = affectedByLight ? renderGroupsHashMap : notAffectedByLightRenderGroupsHashMap;
 
 	// sort hash map indices
@@ -337,12 +357,11 @@ void QuadRenderer::flush(bool affectedByLight)
 			}
 		}
 		
-		debugNumbers.renderGroupsIndices.marker = 0;
-		auto& debugIndices = affectedByLight ? debugNumbers.renderGroupsIndices : debugNumbers.notAffectedByLightRenderGroupsIndices;
+		debugNumbers->renderGroupsIndices.marker = 0;
+		auto& debugIndices = affectedByLight ? debugNumbers->renderGroupsIndices : debugNumbers->notAffectedByLightRenderGroupsIndices;
 		for(unsigned i = 0; i < hashMap.size; ++i)
 		{
-			debugNumbers.renderGroupsIndices.data[i] = hashMap.indices[i];
-			++debugNumbers.renderGroupsIndices.marker;
+			pushBack(&debugNumbers->renderGroupsIndices, hashMap.indices[i]);
 		}
 	}
 
@@ -353,20 +372,21 @@ void QuadRenderer::flush(bool affectedByLight)
 		auto& rg = hashMap.renderGroups[renderGroupIndex];
 
 		// update debug info
-		if(mIsDebugCountingActive) {
-			debugNumbers.drawnSprites += rg.quadsDataSize;
-			debugNumbers.drawnTextures += rg.texturesSize;
+		if(debugNumbersEnabled)
+		{
+			debugNumbers->drawnSprites += rg.quadsDataSize;
+			debugNumbers->drawnTextures += rg.texturesSize;
 			if(affectedByLight)
-				debugNumbers.renderGroupsSizes.data[debugNumbers.renderGroupsSizes.marker++] = rg.quadsDataSize;
+				pushBack(&debugNumbers->renderGroupsSizes, rg.quadsDataSize);
 			else
-				debugNumbers.notAffectedByLightRenderGroupsSizes.data[debugNumbers.notAffectedByLightRenderGroupsSizes.marker++] = rg.quadsDataSize;
+				pushBack(&debugNumbers->notAffectedByLightRenderGroupsSizes, rg.quadsDataSize);
 		}
 
 		// set up shader
-		if(key.shader != mCurrentlyBoundQuadShader) 
+		if(key.shader != currentlyBoundQuadShader) 
 		{
 			key.shader->bind();
-			mCurrentlyBoundQuadShader = key.shader;
+			currentlyBoundQuadShader = key.shader;
 
 			int textures[32];
 			for(int i = 0; i < 32; ++i)
@@ -394,20 +414,19 @@ void QuadRenderer::flush(bool affectedByLight)
 			}
 		};
 
-		auto drawCall = [this, quadsData](size_t nrOfInstances)
+		auto drawCall = [quadsData](size_t nrOfInstances)
 		{
 			char log[50];
 			sprintf(log, "draw call instances: %zu", nrOfInstances);
 			PH_PROFILE_SCOPE(log, 0);
 
-			GLCheck( glBindBuffer(GL_ARRAY_BUFFER, mQuadsDataVBO) );
+			GLCheck( glBindBuffer(GL_ARRAY_BUFFER, quadsDataVBO) );
 			GLCheck( glBufferData(GL_ARRAY_BUFFER, nrOfInstances * sizeof(QuadData), quadsData, GL_STATIC_DRAW) );
 
-			GLCheck( glBindVertexArray(mVAO) );
+			GLCheck( glBindVertexArray(quadsDataVAO) );
 			GLCheck( glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, (GLsizei)nrOfInstances) );
 
-			if(mIsDebugCountingActive)
-				++debugNumbers.drawCalls;
+			++debugNumbers->drawCalls;
 		};
 
 		for(size_t i = 0; i < rg.quadsDataSize; ++i)
@@ -451,5 +470,9 @@ void QuadRenderer::flush(bool affectedByLight)
 	}
 }
 
+void setScreenBoundsPtr(const FloatRect* bounds) 
+{ 
+	screenBounds = bounds; 
+}
 
 }

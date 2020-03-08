@@ -6,8 +6,17 @@
 
 namespace ph {
 
+static size_t bumpToMemoryPageSize(size_t size)
+{
+	size_t temp = size;
+	while(temp > 4096)
+		temp -= 4096;
+	return size + 4096 - temp;	
+}
+
 void allocateAndInitArena(BumpMemoryArena* arena, size_t size)
 {
+	size = bumpToMemoryPageSize(size);
 	char* base = (char*)allocateVirtualMemory(size);
 	initArena(arena, size, base); 
 }
@@ -29,6 +38,7 @@ BumpMemoryArena subArena(BumpMemoryArena* arena, size_t size)
 
 char* pushSize(BumpMemoryArena* arena, size_t size)
 {
+	size = (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); 
 	PH_ASSERT_CRITICAL(arena->used + size <= arena->size, "arena didn't have enough space to allocate from it");	
 	char* result = arena->base + arena->used;
 	arena->used += size;
