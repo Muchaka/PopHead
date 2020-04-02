@@ -1,0 +1,8 @@
+Creating new instrumentation template for main theme.
+  {Creating blank project of 48MHz/24bit working resolution}
+    Loading Sketching libraries
+    --Palette --LABS-synth --LABS-Kontakt --
+    Downloading & installig ViennaEnsemblePro-WIN-6.5.18883 for older 32bit VST2 libraries (--Proteus X2, --EmulatorFX)
+    looking for vst-bridge-1.1.exe /audacity vst enabler plugin/ for W2K VST not working in W10
+    installing Audacity v.2.0.6 for W2K
+    Reviewing...
